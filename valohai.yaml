@@ -1,0 +1,54 @@
+- step:
+    name: train
+    environment: sama-aws-us-east-1-g4dn-xlarge
+    image: mbertrandsama/samaml:latest
+    command:
+      - echo -e $KEY_PASCAL > ~/key_file
+      - chmod 600 ~/key_file
+      - export GIT_SSH_COMMAND="ssh -vvv -o StrictHostKeyChecking=no -i ~/key_file"
+      - ls /valohai/inputs/image/
+      - ./run_script.sh
+    inputs:
+      - name: image
+
+- step:
+    name: pose-estimation
+    environment: sama-aws-us-east-1-g4dn-xlarge
+    image: mbertrandsama/samaml:latest
+    command:
+      - echo -e $KEY_PASCAL > ~/key_file
+      - chmod 600 ~/key_file
+      - export GIT_SSH_COMMAND="ssh -vvv -o StrictHostKeyChecking=no -i ~/key_file"
+      - git clone https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch.git
+      - pip install Cython
+      - pip install -r lightweight-human-pose-estimation.pytorch/requirements.txt
+      - mkdir -p /valohai/outputs/images
+      - cp -r /valohai/inputs/images /valohai/outputs
+      - ./pose-estimation.sh
+    inputs:
+      - name: images
+
+- step:
+    name: pifuhd
+    environment: sama-aws-us-east-1-g4dn-xlarge
+    image: mbertrandsama/samaml:latest
+    command:
+      - echo -e $KEY_PASCAL > ~/key_file
+      - chmod 600 ~/key_file
+      - export GIT_SSH_COMMAND="ssh -vvv -o StrictHostKeyChecking=no -i ~/key_file"
+      - ./run_pifuhd.sh
+    inputs:
+      - name: images
+
+- pipeline:
+    name: pipeline-inference
+    nodes:
+      - name: pose-estimation-node
+        type: execution
+        step: pose-estimation
+      - name: pifuhd-node
+        type: execution
+        step: pifuhd
+    edges:
+      - [pose-estimation-node.output.images*, pifuhd-node.input.images]
+      - [pose-estimation-node.input.images*, pifuhd-node.input.images]
